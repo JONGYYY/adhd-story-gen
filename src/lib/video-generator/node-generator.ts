@@ -25,8 +25,20 @@ function estimateAudioDuration(audioBuffer: Buffer): number {
   return audioBuffer.length / bytesPerSecond;
 }
 
-// Helper function to create a simple video HTML file
-function createVideoHTML(audioUrl: string, title: string, backgroundImage: string): string {
+// Helper function to create a video-like HTML file with background video
+function createVideoHTML(audioUrl: string, title: string, backgroundCategory: string): string {
+  // Map background categories to video files
+  const backgroundVideos: Record<string, string> = {
+    'minecraft': '/backgrounds/minecraft/1.mp4',
+    'subway': '/backgrounds/subway/1.mp4', 
+    'cooking': '/backgrounds/cooking/1.mp4',
+    'workers': '/backgrounds/workers/1.mp4',
+    'Gaming': '/backgrounds/minecraft/1.mp4',
+    'Lifestyle': '/backgrounds/cooking/1.mp4'
+  };
+
+  const backgroundVideo = backgroundVideos[backgroundCategory] || '/backgrounds/minecraft/1.mp4';
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -35,112 +47,296 @@ function createVideoHTML(audioUrl: string, title: string, backgroundImage: strin
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title}</title>
     <style>
-        body {
+        * {
             margin: 0;
             padding: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            font-family: Arial, sans-serif;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+            height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
-            color: white;
         }
+        
         .video-container {
             width: 360px;
             height: 640px;
             background: #000;
-            border-radius: 20px;
+            border-radius: 12px;
             overflow: hidden;
             position: relative;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
         }
-        .background {
+        
+        .background-video {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
-            background-size: 400% 400%;
-            animation: gradient 15s ease infinite;
+            object-fit: cover;
+            opacity: 0.8;
         }
-        @keyframes gradient {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+        
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, 
+                rgba(0,0,0,0.3) 0%, 
+                rgba(0,0,0,0.1) 30%, 
+                rgba(0,0,0,0.1) 70%, 
+                rgba(0,0,0,0.4) 100%);
+            z-index: 1;
         }
+        
         .content {
             position: relative;
             z-index: 2;
-            padding: 40px 20px;
-            text-align: center;
             height: 100%;
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
-        .title {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 30px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-            line-height: 1.2;
-        }
-        .audio-player {
-            width: 100%;
-            margin: 20px 0;
-            background: rgba(255,255,255,0.1);
-            border-radius: 25px;
-            padding: 10px;
-            backdrop-filter: blur(10px);
-        }
-        .audio-player audio {
-            width: 100%;
-            height: 50px;
-        }
-        .play-message {
-            font-size: 18px;
-            margin-top: 20px;
-            opacity: 0.9;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-        }
-        .download-link {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255,255,255,0.2);
+            justify-content: space-between;
+            padding: 20px;
             color: white;
-            padding: 10px 20px;
-            border-radius: 25px;
-            text-decoration: none;
-            font-weight: bold;
-            backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
         }
-        .download-link:hover {
-            background: rgba(255,255,255,0.3);
-            transform: translateX(-50%) translateY(-2px);
+        
+        .reddit-header {
+            background: rgba(255, 255, 255, 0.95);
+            color: #1a1a1b;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .story-title {
+            font-size: 22px;
+            font-weight: bold;
+            line-height: 1.3;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            margin-bottom: 20px;
+            padding: 0 10px;
+        }
+        
+        .controls-section {
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .audio-controls {
+            margin-bottom: 16px;
+        }
+        
+        .audio-controls audio {
+            width: 100%;
+            height: 48px;
+            border-radius: 24px;
+        }
+        
+        .play-button {
+            background: #ff4458;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 24px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px 0;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .play-button:hover {
+            background: #e63946;
+            transform: translateY(-1px);
+        }
+        
+        .status-text {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-top: 8px;
+        }
+        
+        .reddit-ui {
+            position: absolute;
+            bottom: 80px;
+            left: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            color: #1a1a1b;
+            padding: 12px 16px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .upvotes {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: #ff4458;
+        }
+        
+        .comments {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: #878a8c;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .playing .background-video {
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .waveform {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            height: 20px;
+            margin: 10px 0;
+        }
+        
+        .wave-bar {
+            width: 3px;
+            background: #ff4458;
+            border-radius: 2px;
+            opacity: 0.3;
+            transition: all 0.1s ease;
+        }
+        
+        .playing .wave-bar {
+            animation: wave 1s ease-in-out infinite;
+        }
+        
+        @keyframes wave {
+            0%, 100% { height: 4px; opacity: 0.3; }
+            50% { height: 16px; opacity: 1; }
         }
     </style>
 </head>
 <body>
-    <div class="video-container">
-        <div class="background"></div>
+    <div class="video-container" id="videoContainer">
+        <video class="background-video" autoplay muted loop playsinline>
+            <source src="${backgroundVideo}" type="video/mp4">
+        </video>
+        
+        <div class="overlay"></div>
+        
         <div class="content">
-            <div class="title">${title}</div>
-            <div class="audio-player">
-                <audio controls>
-                    <source src="${audioUrl}" type="audio/mpeg">
-                    Your browser does not support the audio element.
-                </audio>
+            <div class="reddit-header">
+                📱 r/stories • Posted by u/Anonymous
             </div>
-            <div class="play-message">🎧 Your story is ready to listen!</div>
+            
+            <div class="story-title">${title}</div>
+            
+            <div class="controls-section">
+                <div class="audio-controls">
+                    <audio id="storyAudio" preload="auto">
+                        <source src="${audioUrl}" type="audio/mpeg">
+                    </audio>
+                </div>
+                
+                <button class="play-button" id="playButton">
+                    <span id="playIcon">▶️</span>
+                    <span id="playText">Play Story</span>
+                </button>
+                
+                <div class="waveform" id="waveform">
+                    ${Array.from({length: 20}, (_, i) => `<div class="wave-bar" style="animation-delay: ${i * 0.1}s; height: ${Math.random() * 12 + 4}px;"></div>`).join('')}
+                </div>
+                
+                <div class="status-text" id="statusText">
+                    🎧 Tap play to start the story
+                </div>
+            </div>
         </div>
-        <a href="${audioUrl}" download class="download-link">Download Audio</a>
+        
+        <div class="reddit-ui">
+            <div class="upvotes">⬆️ ${Math.floor(Math.random() * 500) + 100}</div>
+            <div class="comments">💬 ${Math.floor(Math.random() * 50) + 10}</div>
+            <div>🎁 ${Math.floor(Math.random() * 5) + 1}</div>
+        </div>
     </div>
+
+    <script>
+        const audio = document.getElementById('storyAudio');
+        const playButton = document.getElementById('playButton');
+        const playIcon = document.getElementById('playIcon');
+        const playText = document.getElementById('playText');
+        const statusText = document.getElementById('statusText');
+        const container = document.getElementById('videoContainer');
+        const waveform = document.getElementById('waveform');
+        
+        let isPlaying = false;
+        
+        playButton.addEventListener('click', function() {
+            if (!isPlaying) {
+                audio.play();
+                isPlaying = true;
+                playIcon.textContent = '⏸️';
+                playText.textContent = 'Pause';
+                statusText.textContent = '🔊 Story is playing...';
+                container.classList.add('playing');
+            } else {
+                audio.pause();
+                isPlaying = false;
+                playIcon.textContent = '▶️';
+                playText.textContent = 'Play Story';
+                statusText.textContent = '⏸️ Story paused';
+                container.classList.remove('playing');
+            }
+        });
+        
+        audio.addEventListener('ended', function() {
+            isPlaying = false;
+            playIcon.textContent = '▶️';
+            playText.textContent = 'Play Again';
+            statusText.textContent = '✅ Story completed!';
+            container.classList.remove('playing');
+        });
+        
+        audio.addEventListener('timeupdate', function() {
+            if (isPlaying) {
+                const progress = (audio.currentTime / audio.duration) * 100;
+                statusText.textContent = \`🔊 Playing... \${Math.floor(progress)}%\`;
+            }
+        });
+        
+        // Auto-start the background video
+        const backgroundVideo = document.querySelector('.background-video');
+        backgroundVideo.addEventListener('loadeddata', function() {
+            // Start at a random point in the video
+            const randomStart = Math.random() * (backgroundVideo.duration - 30);
+            backgroundVideo.currentTime = randomStart;
+        });
+    </script>
 </body>
 </html>
   `;
