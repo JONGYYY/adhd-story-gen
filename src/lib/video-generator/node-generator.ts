@@ -161,16 +161,16 @@ export async function generateVideo(
     await fs.mkdir(tmpDir, { recursive: true });
 
     // 1. Story is already provided (10%)
-    await updateProgress(videoId, 0);
+    if (!process.env.VERCEL) await updateProgress(videoId, 0);
     const story = options.story;
-    await updateProgress(videoId, 10);
+    if (!process.env.VERCEL) await updateProgress(videoId, 10);
 
     // 2. Generate speech for opening and story (50%)
     const openingAudio = await generateSpeech({
       text: story.startingQuestion || story.title,
       voice: options.voice,
     });
-    await updateProgress(videoId, 30);
+    if (!process.env.VERCEL) await updateProgress(videoId, 30);
 
     const storyText = options.isCliffhanger && story.story.includes('[BREAK]')
       ? story.story.split('[BREAK]')[0].trim()
@@ -180,7 +180,7 @@ export async function generateVideo(
       text: storyText,
       voice: options.voice,
     });
-    await updateProgress(videoId, 50);
+    if (!process.env.VERCEL) await updateProgress(videoId, 50);
 
     // 3. Combine audio files (70%)
     const openingBuffer = arrayBufferToBuffer(openingAudio);
@@ -193,7 +193,7 @@ export async function generateVideo(
     const audioFilename = `audio_${videoId}.mp3`;
     const audioPath = path.join(tmpDir, audioFilename);
     await fs.writeFile(audioPath, combinedAudio);
-    await updateProgress(videoId, 70);
+    if (!process.env.VERCEL) await updateProgress(videoId, 70);
 
     // 4. Create HTML video player (90%)
     const htmlFilename = `video_${videoId}.html`;
@@ -202,12 +202,14 @@ export async function generateVideo(
     
     const htmlContent = createVideoHTML(audioUrl, story.title, options.background.category);
     await fs.writeFile(htmlPath, htmlContent);
-    await updateProgress(videoId, 90);
+    if (!process.env.VERCEL) await updateProgress(videoId, 90);
 
     // 5. Set video URL (100%)
     const videoUrl = `/api/videos/${htmlFilename}`;
-    await setVideoReady(videoId, videoUrl);
-    await updateProgress(videoId, 100);
+    if (!process.env.VERCEL) {
+      await setVideoReady(videoId, videoUrl);
+      await updateProgress(videoId, 100);
+    }
 
     console.log('Video generation completed successfully:', videoUrl);
     return videoUrl;
@@ -215,7 +217,7 @@ export async function generateVideo(
     console.error('Error in generateVideo:', error);
     // Set video status to failed with error message
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    await setVideoFailed(videoId, errorMessage);
+    if (!process.env.VERCEL) await setVideoFailed(videoId, errorMessage);
     throw error;
   }
 } 

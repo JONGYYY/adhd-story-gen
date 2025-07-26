@@ -292,6 +292,24 @@ export default function Create() {
         throw new Error(`Invalid response from server: ${JSON.stringify(data)}`);
       }
 
+      // Handle synchronous response (Vercel)
+      if (data.synchronous && data.videoContent && data.audioContent) {
+        console.log('Received synchronous response, storing content and redirecting');
+        
+        // Store the video and audio content in sessionStorage
+        sessionStorage.setItem(`video_${data.videoId}_html`, data.videoContent);
+        sessionStorage.setItem(`video_${data.videoId}_audio`, data.audioContent);
+        sessionStorage.setItem(`video_${data.videoId}_audioType`, data.audioContentType || 'audio/mpeg');
+        
+        // Set progress to 100% and redirect immediately
+        setProgress(100);
+        setTimeout(() => {
+          window.location.href = `/video/${data.videoId}`;
+        }, 500); // Small delay to show completion
+        
+        return;
+      }
+
       console.log('Starting to poll for video status with ID:', data.videoId);
 
       // Start polling for video status

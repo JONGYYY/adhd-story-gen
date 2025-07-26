@@ -24,6 +24,29 @@ export default function VideoPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
+    // First check if we have synchronous content in sessionStorage (from Vercel)
+    const checkSessionStorage = () => {
+      const htmlContent = sessionStorage.getItem(`video_${videoId}_html`);
+      const audioContent = sessionStorage.getItem(`video_${videoId}_audio`);
+      
+      if (htmlContent && audioContent) {
+        console.log('Found synchronous content in sessionStorage');
+        setVideoStatus({
+          status: 'ready',
+          videoUrl: 'sessionStorage', // Special marker
+          progress: 100
+        });
+        return true;
+      }
+      return false;
+    };
+
+    // If we have sessionStorage content, use it immediately
+    if (checkSessionStorage()) {
+      return;
+    }
+
+    // Otherwise, use the normal polling mechanism for localhost
     const checkStatus = async () => {
       try {
         const response = await fetch(`/api/video-status/${videoId}`);
@@ -47,6 +70,7 @@ export default function VideoPage() {
       }
     };
 
+    console.log('No sessionStorage content found, starting API polling');
     checkStatus();
 
     // Cleanup timeout on unmount
@@ -91,6 +115,27 @@ export default function VideoPage() {
     if (!videoStatus.videoUrl) return;
 
     try {
+      // Handle sessionStorage content (from Vercel)
+      if (videoStatus.videoUrl === 'sessionStorage') {
+        const htmlContent = sessionStorage.getItem(`video_${videoId}_html`);
+        const audioContent = sessionStorage.getItem(`video_${videoId}_audio`);
+        
+        if (htmlContent && audioContent) {
+          // Create a downloadable HTML file
+          const blob = new Blob([htmlContent], { type: 'text/html' });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `video_${videoId}.html`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+          return;
+        }
+      }
+
+      // Handle regular video files (from localhost)
       const response = await fetch(videoStatus.videoUrl);
       if (!response.ok) throw new Error('Failed to download video');
 
@@ -116,10 +161,25 @@ export default function VideoPage() {
     setUploadError(null);
     
     try {
-      // Get the video file
-      const videoResponse = await fetch(videoStatus.videoUrl);
-      if (!videoResponse.ok) throw new Error('Failed to fetch video');
-      const videoBlob = await videoResponse.blob();
+      let videoBlob: Blob;
+      
+      // Handle sessionStorage content (from Vercel)
+      if (videoStatus.videoUrl === 'sessionStorage') {
+        const htmlContent = sessionStorage.getItem(`video_${videoId}_html`);
+        
+        if (htmlContent) {
+          // For HTML content, we can't upload to TikTok directly
+          // TikTok only accepts video files, not HTML
+          throw new Error('HTML videos cannot be uploaded to TikTok. Please download the HTML file instead.');
+        } else {
+          throw new Error('Video content not found in session storage');
+        }
+      } else {
+        // Handle regular video files (from localhost)
+        const videoResponse = await fetch(videoStatus.videoUrl);
+        if (!videoResponse.ok) throw new Error('Failed to fetch video');
+        videoBlob = await videoResponse.blob();
+      }
       
       // Create form data
       const formData = new FormData();
@@ -196,7 +256,19 @@ export default function VideoPage() {
                         Try Again
                       </Button>
                     </div>
+                  ) : videoStatus.videoUrl === 'sessionStorage' ? (
+                    // Render HTML content from sessionStorage
+                    <div className="w-full rounded-lg overflow-hidden bg-black">
+                      <iframe
+                        className="w-full aspect-[9/16] min-h-[600px] border-0"
+                        srcDoc={sessionStorage.getItem(`video_${videoId}_html`) || ''}
+                        title="Generated Video"
+                        sandbox="allow-scripts allow-same-origin"
+                        onError={handleVideoError}
+                      />
+                    </div>
                   ) : (
+                    // Render regular video file
                     <video
                       ref={videoRef}
                       className="w-full rounded-lg"
