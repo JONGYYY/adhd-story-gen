@@ -103,6 +103,11 @@ export default function VideoPage() {
     setVideoError('Failed to load video. Please try refreshing the page.');
   };
 
+  const handleIframeError = (e: React.SyntheticEvent<HTMLIFrameElement, Event>) => {
+    console.error('Iframe playback error:', e);
+    setVideoError('Failed to load video content. Please try refreshing the page.');
+  };
+
   const handleRetry = () => {
     setVideoError(null);
     setRetryCount(0);
@@ -264,7 +269,7 @@ export default function VideoPage() {
                         srcDoc={sessionStorage.getItem(`video_${videoId}_html`) || ''}
                         title="Generated Video"
                         sandbox="allow-scripts allow-same-origin"
-                        onError={handleVideoError}
+                        onError={handleIframeError}
                       />
                     </div>
                   ) : (
