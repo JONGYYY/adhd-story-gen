@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { PageContainer } from '@/components/layout/page-container';
 import { VideoOptions, VoiceOption, VideoBackground } from '@/lib/video-generator/types';
 import { Progress } from '@/components/ui/progress';
+import { API_CONFIG } from '@/lib/config/api';
 
 type Voice = {
   id: VoiceOption['id'];
@@ -267,7 +268,7 @@ export default function Create() {
       };
 
       console.log('Sending video generation request...');
-      const response = await fetch('/api/generate-video', {
+      const response = await fetch(API_CONFIG.getVideoGenerationUrl(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -330,7 +331,7 @@ export default function Create() {
           }
 
           console.log(`Polling video status (attempt ${pollCount}/${maxPolls})`);
-          const statusResponse = await fetch(`/api/video-status/${data.videoId}`);
+          const statusResponse = await fetch(API_CONFIG.getVideoStatusUrl(data.videoId));
           
           if (!statusResponse.ok) {
             console.error('Status response not ok:', statusResponse.status, statusResponse.statusText);

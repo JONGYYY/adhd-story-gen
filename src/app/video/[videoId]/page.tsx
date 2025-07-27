@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { PageContainer } from '@/components/layout/page-container';
 import { Button } from '@/components/ui/button';
+import { API_CONFIG } from '@/lib/config/api';
 
 type VideoStatus = {
   status: 'generating' | 'ready' | 'failed';
@@ -49,7 +50,7 @@ export default function VideoPage() {
     // Otherwise, use the normal polling mechanism for localhost
     const checkStatus = async () => {
       try {
-        const response = await fetch(`/api/video-status/${videoId}`);
+        const response = await fetch(API_CONFIG.getVideoStatusUrl(videoId));
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(errorText || 'Failed to fetch video status');
