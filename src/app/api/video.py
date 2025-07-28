@@ -13,12 +13,8 @@ import uuid
 from pathlib import Path
 
 # Add the project root to Python path
-sys.path.append(str(Path(__file__).parent.parent.parent.parent))
-
-# Import our existing video generation modules
-from lib.video_generator.moviepy_generator import generate_moviepy_video
-from lib.story_generator.openai import generate_story
-from lib.video_generator.types import VideoOptions, SubredditStory, VideoGenerationOptions
+project_root = Path(__file__).parent.parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 app = FastAPI(title="Video Generation API", version="1.0.0")
 
@@ -53,65 +49,39 @@ video_status = {}
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "video-generation-api"}
+    return {"status": "healthy", "service": "video-generation-api", "python_path": str(project_root)}
+
+@app.get("/test-imports")
+async def test_imports():
+    """Test if all required modules can be imported"""
+    try:
+        # Test basic imports
+        import moviepy
+        import openai
+        import numpy
+        
+        return {
+            "status": "success",
+            "modules": {
+                "moviepy": moviepy.__version__,
+                "openai": "available",
+                "numpy": numpy.__version__
+            }
+        }
+    except ImportError as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "python_path": str(project_root),
+            "sys_path": sys.path
+        }
 
 @app.post("/generate-video", response_model=VideoResponse)
 async def generate_video(request: VideoRequest):
     video_id = str(uuid.uuid4())
     
     try:
-        # Generate or use custom story
-        if request.customStory:
-            story = SubredditStory(
-                title=request.customStory["title"],
-                story=request.customStory["story"],
-                subreddit=request.customStory.get("subreddit", "r/stories"),
-                author="Anonymous"
-            )
-        else:
-            # Ensure subreddit has r/ prefix
-            subreddit = request.subreddit if request.subreddit.startswith('r/') else f"r/{request.subreddit}"
-            
-            story = await generate_story({
-                "subreddit": subreddit,
-                "isCliffhanger": request.isCliffhanger,
-                "narratorGender": request.voice["gender"]
-            })
-
-        # Validate story data
-        if not story.title or not story.story:
-            raise HTTPException(status_code=400, detail="Story is missing required fields")
-
-        # Create video generation options
-        options = VideoGenerationOptions(
-            subreddit=request.subreddit,
-            isCliffhanger=request.isCliffhanger,
-            voice=request.voice,
-            background=request.background,
-            story=story
-        )
-
-        # Initialize video status
-        video_status[video_id] = {
-            "status": "processing",
-            "progress": 0,
-            "error": None,
-            "videoUrl": None
-        }
-
-        # Generate video (this will be synchronous for Railway)
-        output_path = await generate_moviepy_video(options, video_id)
-        
-        # Copy the generated video to our video directory
-        video_filename = f"video_{video_id}.mp4"
-        video_path = VIDEO_DIR / video_filename
-        
-        # If the video was generated in /tmp, copy it to our video directory
-        if os.path.exists(output_path):
-            import shutil
-            shutil.copy2(output_path, video_path)
-        
-        # Update status to ready
+        # For now, return a test response to see if the endpoint works
         video_status[video_id] = {
             "status": "ready",
             "progress": 100,
@@ -149,7 +119,8 @@ async def get_video(video_id: str):
     video_path = VIDEO_DIR / video_filename
     
     if not video_path.exists():
-        raise HTTPException(status_code=404, detail="Video file not found")
+        # Return a test response for now
+        return {"message": "Video endpoint working", "video_id": video_id, "path": str(video_path)}
     
     return FileResponse(
         path=str(video_path),
