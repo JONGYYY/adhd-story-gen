@@ -1,0 +1,33 @@
+# Ignore Node.js files for Railway Python deployment
+node_modules/
+package.json
+package-lock.json
+next.config.js
+.next/
+.vercel/
+
+# Ignore frontend files
+src/app/*
+!src/app/api/video.py
+src/components/
+src/lib/*
+!src/lib/video-generator/
+!src/lib/story-generator/
+public/
+
+# Ignore other config files
+tailwind.config.*
+postcss.config.*
+tsconfig.json
+eslint.config.*
+components.json
+
+# Keep only Python-related files
+# requirements.txt (keep)
+# runtime.txt (keep)  
+# Procfile (keep)
+# nixpacks.toml (keep)
+# railway.json (keep)
+# src/app/api/video.py (keep)
+# src/lib/video-generator/ (keep)
+# src/lib/story-generator/ (keep) 

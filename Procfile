@@ -1,1 +1,1 @@
-web: python -m uvicorn src.app.api.video:app --host 0.0.0.0 --port $PORT 
+web: python main.py 
