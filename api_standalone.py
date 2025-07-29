@@ -15,6 +15,8 @@ import tempfile
 import subprocess
 import json
 import base64
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 app = FastAPI(title="Video Generation API", version="1.0.0")
 
@@ -46,6 +48,9 @@ class VideoResponse(BaseModel):
 
 # In-memory storage for video status
 video_status = {}
+
+# Thread pool for CPU-intensive tasks
+thread_pool = ThreadPoolExecutor(max_workers=2)
 
 @app.get("/health")
 async def health_check():
@@ -116,25 +121,21 @@ def generate_test_video(video_id: str, subreddit: str) -> str:
             str(video_path),
             fps=24,
             codec='libx264',
-            audio_codec='aac'
+            audio_codec='aac',
+            verbose=False,
+            logger=None
         )
         
         return str(video_path)
         
     except Exception as e:
         print(f"Error generating video: {e}")
-        # Create a simple text file as fallback
-        video_path = VIDEO_DIR / f"video_{video_id}.txt"
-        with open(video_path, 'w') as f:
-            f.write(f"Test video for {subreddit}\nVideo ID: {video_id}\nError: {e}")
-        return str(video_path)
+        raise
 
-@app.post("/generate-video", response_model=VideoResponse)
-async def generate_video(request: VideoRequest):
-    video_id = str(uuid.uuid4())
-    
+async def generate_video_async(video_id: str, request: VideoRequest):
+    """Asynchronously generate video in a thread pool"""
     try:
-        # Set initial status
+        # Update status to generating
         video_status[video_id] = {
             "status": "generating",
             "progress": 0,
@@ -142,11 +143,14 @@ async def generate_video(request: VideoRequest):
             "videoUrl": None
         }
         
-        # Update progress to 50%
-        video_status[video_id]["progress"] = 50
-        
-        # Generate the video (this is a simplified version)
-        video_path = generate_test_video(video_id, request.subreddit)
+        # Run video generation in thread pool
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            thread_pool,
+            generate_test_video,
+            video_id,
+            request.subreddit
+        )
         
         # Update status to ready
         video_status[video_id] = {
@@ -155,7 +159,26 @@ async def generate_video(request: VideoRequest):
             "error": None,
             "videoUrl": f"/video/{video_id}"
         }
+        
+    except Exception as e:
+        error_msg = str(e)
+        print(f"Error in generate_video_async: {error_msg}")
+        video_status[video_id] = {
+            "status": "failed",
+            "progress": 0,
+            "error": error_msg,
+            "videoUrl": None
+        }
+        raise
 
+@app.post("/generate-video", response_model=VideoResponse)
+async def generate_video(request: VideoRequest):
+    video_id = str(uuid.uuid4())
+    
+    try:
+        # Start video generation in background
+        asyncio.create_task(generate_video_async(video_id, request))
+        
         return VideoResponse(
             success=True,
             videoId=video_id,
@@ -186,14 +209,12 @@ async def get_video(video_id: str):
     video_path = VIDEO_DIR / video_filename
     
     if not video_path.exists():
-        # Check if there's a text file (fallback)
-        txt_path = VIDEO_DIR / f"video_{video_id}.txt"
-        if txt_path.exists():
-            return FileResponse(
-                path=str(txt_path),
-                media_type="text/plain",
-                filename=f"video_{video_id}.txt"
-            )
+        # Check if video is still generating
+        if video_id in video_status and video_status[video_id]["status"] == "generating":
+            return {
+                "status": "generating",
+                "message": "Video is still being generated"
+            }
         
         raise HTTPException(status_code=404, detail="Video file not found")
     

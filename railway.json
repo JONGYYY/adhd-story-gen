@@ -1,18 +1,12 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "builder": "NIXPACKS"
+    "builder": "NIXPACKS",
+    "buildCommand": "pip install -r requirements.txt"
   },
   "deploy": {
     "startCommand": "python main.py",
-    "healthcheckPath": "/health"
-  },
-  "environments": {
-    "production": {
-      "variables": {
-        "NIXPACKS_NO_DEFAULT_CACHE_DIRECTORIES": "1",
-        "NIXPACKS_PYTHON_VERSION": "3.11"
-      }
-    }
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 100
   }
 } 
