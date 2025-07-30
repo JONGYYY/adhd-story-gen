@@ -156,12 +156,12 @@ def generate_simple_video(video_id: str, request: VideoRequest) -> str:
         # Create background
         update_progress(video_id, 50)
         print(f"Progress 50% - Creating background clip")
-        bg_clip = ColorClip(size=(1080, 1920), color=(0, 0, 0), duration=10)
+        bg_clip = ColorClip(size=(1080, 1920), color=(0, 0, 0), duration=5)  # Shorter duration
         
         # Create text clip
         update_progress(video_id, 65)
         print(f"Progress 65% - Creating text clip")
-        text_clip = ImageClip(str(text_img_path)).set_duration(10).set_position('center')
+        text_clip = ImageClip(str(text_img_path)).set_duration(5).set_position('center')
         
         # Composite video
         update_progress(video_id, 80)
@@ -176,34 +176,47 @@ def generate_simple_video(video_id: str, request: VideoRequest) -> str:
         print(f"Writing video to: {video_path}")
         
         try:
+            # Use the simplest possible settings
+            print("Attempting simple video write...")
             final_clip.write_videofile(
                 str(video_path),
-                fps=24,
+                fps=15,  # Lower FPS
                 codec='libx264',
-                audio_codec='aac',
+                audio=False,  # No audio at all
                 verbose=False,
                 logger=None,
-                temp_audiofile=None,
-                remove_temp=True
+                preset='ultrafast',  # Fastest encoding
+                ffmpeg_params=['-pix_fmt', 'yuv420p']  # Ensure compatibility
             )
             print(f"Video file written successfully: {video_path}")
         except Exception as write_error:
             print(f"Error writing video file: {write_error}")
-            # Try a simpler approach without audio codec
+            # Try even simpler approach
             try:
-                print("Retrying video write without audio codec...")
+                print("Retrying with most basic settings...")
                 final_clip.write_videofile(
                     str(video_path),
-                    fps=24,
-                    codec='libx264',
+                    fps=10,  # Even lower FPS
                     verbose=False,
-                    logger=None,
-                    audio=False  # Disable audio since it's just a test video
+                    logger=None
                 )
-                print(f"Video file written successfully (no audio): {video_path}")
+                print(f"Video file written successfully (basic): {video_path}")
             except Exception as retry_error:
                 print(f"Retry also failed: {retry_error}")
-                raise write_error
+                # Last resort: just save the text image as a single frame "video"
+                try:
+                    print("Creating single-frame video as last resort...")
+                    single_frame = ImageClip(str(text_img_path)).set_duration(3)
+                    single_frame.write_videofile(
+                        str(video_path),
+                        fps=1,
+                        verbose=False,
+                        logger=None
+                    )
+                    print(f"Single-frame video created: {video_path}")
+                except Exception as final_error:
+                    print(f"All video creation attempts failed: {final_error}")
+                    raise write_error
         
         # Check if file was actually created
         if not video_path.exists():
@@ -211,6 +224,9 @@ def generate_simple_video(video_id: str, request: VideoRequest) -> str:
         
         file_size = video_path.stat().st_size
         print(f"Video file created successfully. Size: {file_size} bytes")
+        
+        if file_size < 1000:  # Less than 1KB is probably an error
+            raise Exception(f"Video file too small ({file_size} bytes), likely corrupted")
         
         # Ensure video file is readable
         os.chmod(str(video_path), 0o666)
