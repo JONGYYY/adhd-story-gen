@@ -10,6 +10,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from PIL import Image, ImageDraw, ImageFont
+import textwrap
 
 app = FastAPI(title="Video Generation API", version="1.0.0")
 
@@ -51,6 +53,45 @@ class VideoResponse(BaseModel):
 
 # Thread pool for CPU-intensive tasks
 thread_pool = ThreadPoolExecutor(max_workers=2)
+
+def create_text_image(text: str, size: tuple = (1080, 1920), font_size: int = 60) -> Image.Image:
+    """Create a text image using PIL"""
+    # Create a new image with a black background
+    img = Image.new('RGB', size, color='black')
+    draw = ImageDraw.Draw(img)
+    
+    # Try to use a default font, fallback to built-in if needed
+    try:
+        # Try to load a system font
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
+    except (OSError, IOError):
+        try:
+            # Fallback to default font
+            font = ImageFont.load_default()
+        except:
+            font = None
+    
+    # Wrap text to fit the image
+    wrapper = textwrap.TextWrapper(width=30)  # Adjust width as needed
+    wrapped_text = wrapper.fill(text)
+    
+    # Calculate text position (center)
+    if font:
+        bbox = draw.textbbox((0, 0), wrapped_text, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+    else:
+        # Estimate size if no font available
+        text_width = len(wrapped_text.split('\n')[0]) * 10
+        text_height = len(wrapped_text.split('\n')) * 20
+    
+    x = (size[0] - text_width) // 2
+    y = (size[1] - text_height) // 2
+    
+    # Draw text
+    draw.text((x, y), wrapped_text, fill='white', font=font, align='center')
+    
+    return img
 
 def save_status(video_id: str, status: Dict[str, Any]):
     """Save video status to a file"""
@@ -96,8 +137,6 @@ def generate_simple_video(video_id: str, request: VideoRequest) -> str:
     try:
         from moviepy.editor import ColorClip, ImageClip, CompositeVideoClip
         import numpy as np
-        from PIL import Image, ImageDraw, ImageFont
-        import textwrap
         
         # Update progress - Starting
         update_progress(video_id, 25)
