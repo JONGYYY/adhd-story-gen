@@ -138,54 +138,98 @@ def generate_simple_video(video_id: str, request: VideoRequest) -> str:
         from moviepy.editor import ColorClip, ImageClip, CompositeVideoClip
         import numpy as np
         
+        print(f"Starting video generation for {video_id}")
+        
         # Update progress - Starting
         update_progress(video_id, 25)
+        print(f"Progress 25% - Starting generation")
         
         # Create text image
         update_progress(video_id, 35)
+        print(f"Progress 35% - Creating text image")
         text_content = f"Test Video\nSubreddit: {request.subreddit}"
         text_img = create_text_image(text_content)
         text_img_path = VIDEO_DIR / f"text_{video_id}.png"
         text_img.save(str(text_img_path))
+        print(f"Text image saved: {text_img_path}")
         
         # Create background
         update_progress(video_id, 50)
+        print(f"Progress 50% - Creating background clip")
         bg_clip = ColorClip(size=(1080, 1920), color=(0, 0, 0), duration=10)
         
         # Create text clip
         update_progress(video_id, 65)
+        print(f"Progress 65% - Creating text clip")
         text_clip = ImageClip(str(text_img_path)).set_duration(10).set_position('center')
         
         # Composite video
         update_progress(video_id, 80)
+        print(f"Progress 80% - Compositing video clips")
         final_clip = CompositeVideoClip([bg_clip, text_clip])
         
-        # Save video
+        # Save video - this is the critical step
+        print(f"Progress 85% - Starting video file write")
+        update_progress(video_id, 85)
+        
         video_path = VIDEO_DIR / f"video_{video_id}.mp4"
-        final_clip.write_videofile(
-            str(video_path),
-            fps=24,
-            codec='libx264',
-            audio_codec='aac',
-            verbose=False,
-            logger=None,
-            temp_audiofile=None,
-            remove_temp=True
-        )
+        print(f"Writing video to: {video_path}")
+        
+        try:
+            final_clip.write_videofile(
+                str(video_path),
+                fps=24,
+                codec='libx264',
+                audio_codec='aac',
+                verbose=False,
+                logger=None,
+                temp_audiofile=None,
+                remove_temp=True
+            )
+            print(f"Video file written successfully: {video_path}")
+        except Exception as write_error:
+            print(f"Error writing video file: {write_error}")
+            # Try a simpler approach without audio codec
+            try:
+                print("Retrying video write without audio codec...")
+                final_clip.write_videofile(
+                    str(video_path),
+                    fps=24,
+                    codec='libx264',
+                    verbose=False,
+                    logger=None,
+                    audio=False  # Disable audio since it's just a test video
+                )
+                print(f"Video file written successfully (no audio): {video_path}")
+            except Exception as retry_error:
+                print(f"Retry also failed: {retry_error}")
+                raise write_error
+        
+        # Check if file was actually created
+        if not video_path.exists():
+            raise Exception(f"Video file was not created at {video_path}")
+        
+        file_size = video_path.stat().st_size
+        print(f"Video file created successfully. Size: {file_size} bytes")
         
         # Ensure video file is readable
         os.chmod(str(video_path), 0o666)
+        print(f"Video file permissions set: {video_path}")
         
         # Clean up
         if text_img_path.exists():
             text_img_path.unlink()
+            print(f"Cleaned up text image: {text_img_path}")
         
         # Update progress - Complete
+        print(f"Progress 100% - Video generation complete")
         update_progress(video_id, 100, "ready")
         return str(video_path)
         
     except Exception as e:
         print(f"Error generating video: {e}")
+        import traceback
+        traceback.print_exc()
         update_progress(video_id, 0, "failed", str(e))
         raise
 
