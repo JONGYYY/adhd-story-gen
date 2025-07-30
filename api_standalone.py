@@ -3,32 +3,35 @@
 Standalone FastAPI service for Railway deployment
 This is a minimal video generation API that doesn't depend on the existing project structure
 """
+import asyncio
+import json
+import os
+import tempfile
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Dict, Any, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
-import os
-import uuid
-from pathlib import Path
-import tempfile
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
 
 app = FastAPI(title="Video Generation API", version="1.0.0")
 
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify your Vercel domain
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Create a directory for storing videos
+# Create directories for storing videos and status
 VIDEO_DIR = Path("/tmp/videos")
+STATUS_DIR = Path("/tmp/status")
 VIDEO_DIR.mkdir(exist_ok=True)
+STATUS_DIR.mkdir(exist_ok=True)
 
 class VideoRequest(BaseModel):
     subreddit: str
@@ -43,52 +46,33 @@ class VideoResponse(BaseModel):
     videoUrl: Optional[str] = None
     error: Optional[str] = None
 
-# In-memory storage for video status
-video_status = {}
-
 # Thread pool for CPU-intensive tasks
 thread_pool = ThreadPoolExecutor(max_workers=2)
 
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "healthy", 
-        "service": "video-generation-api",
-        "version": "1.0.0"
-    }
+def save_status(video_id: str, status: Dict[str, Any]):
+    """Save video status to a file"""
+    status_file = STATUS_DIR / f"{video_id}.json"
+    with open(status_file, 'w') as f:
+        json.dump(status, f)
 
-@app.get("/test-imports")
-async def test_imports():
-    """Test if all required modules can be imported"""
+def get_status(video_id: str) -> Optional[Dict[str, Any]]:
+    """Get video status from file"""
+    status_file = STATUS_DIR / f"{video_id}.json"
     try:
-        import moviepy
-        import openai
-        import numpy
-        from PIL import Image, ImageDraw, ImageFont
-        
-        return {
-            "status": "success",
-            "modules": {
-                "moviepy": str(moviepy.__version__),
-                "openai": "available",
-                "numpy": str(numpy.__version__),
-                "pillow": "available"
-            },
-            "environment": {
-                "python_version": f"{os.sys.version}",
-                "video_dir": str(VIDEO_DIR),
-                "video_dir_exists": VIDEO_DIR.exists()
-            }
-        }
-    except ImportError as e:
-        return {
-            "status": "error",
-            "error": str(e),
-            "environment": {
-                "python_version": f"{os.sys.version}",
-                "video_dir": str(VIDEO_DIR)
-            }
-        }
+        with open(status_file) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+def update_progress(video_id: str, progress: int, status: str = "generating", error: Optional[str] = None):
+    """Update video generation progress"""
+    status_data = {
+        "status": status,
+        "progress": progress,
+        "error": error,
+        "videoUrl": f"/video/{video_id}" if status == "ready" else None
+    }
+    save_status(video_id, status_data)
 
 def create_text_image(text: str, size: tuple = (1080, 1920), font_size: int = 60) -> 'PIL.Image.Image':
     """Create an image with text using PIL instead of MoviePy TextClip"""
@@ -132,33 +116,37 @@ def create_text_image(text: str, size: tuple = (1080, 1920), font_size: int = 60
     
     return img
 
-def generate_simple_video(video_id: str, subreddit: str) -> str:
-    """Generate a simple video using PIL and MoviePy without TextClip"""
+def generate_simple_video(video_id: str, request: VideoRequest) -> str:
+    """Generate a simple video using PIL and MoviePy"""
     try:
         from moviepy.editor import ColorClip, ImageClip, CompositeVideoClip
         import numpy as np
+        from PIL import Image, ImageDraw, ImageFont
+        import textwrap
         
-        # Create a simple test video
-        duration = 10  # 10 seconds
+        # Update progress - Starting
+        update_progress(video_id, 25)
         
-        # Create text image using PIL
-        text_content = f"Test Video\nSubreddit: {subreddit}\nVideo ID: {video_id[:8]}..."
-        text_img = create_text_image(text_content, size=(1080, 1920), font_size=50)
-        
-        # Save text image temporarily
+        # Create text image
+        update_progress(video_id, 35)
+        text_content = f"Test Video\nSubreddit: {request.subreddit}"
+        text_img = create_text_image(text_content)
         text_img_path = VIDEO_DIR / f"text_{video_id}.png"
         text_img.save(str(text_img_path))
         
-        # Create a background color clip
-        bg_clip = ColorClip(size=(1080, 1920), color=(0, 0, 0), duration=duration)
+        # Create background
+        update_progress(video_id, 50)
+        bg_clip = ColorClip(size=(1080, 1920), color=(0, 0, 0), duration=10)
         
-        # Create image clip from our text image
-        text_clip = ImageClip(str(text_img_path)).set_duration(duration).set_position('center')
+        # Create text clip
+        update_progress(video_id, 65)
+        text_clip = ImageClip(str(text_img_path)).set_duration(10).set_position('center')
         
-        # Composite the clips
+        # Composite video
+        update_progress(video_id, 80)
         final_clip = CompositeVideoClip([bg_clip, text_clip])
         
-        # Save the video
+        # Save video
         video_path = VIDEO_DIR / f"video_{video_id}.mp4"
         final_clip.write_videofile(
             str(video_path),
@@ -171,53 +159,46 @@ def generate_simple_video(video_id: str, subreddit: str) -> str:
             remove_temp=True
         )
         
-        # Clean up temporary image
+        # Clean up
         if text_img_path.exists():
             text_img_path.unlink()
         
+        # Update progress - Complete
+        update_progress(video_id, 100, "ready")
         return str(video_path)
         
     except Exception as e:
         print(f"Error generating video: {e}")
+        update_progress(video_id, 0, "failed", str(e))
         raise
 
 async def generate_video_async(video_id: str, request: VideoRequest):
-    """Asynchronously generate video in a thread pool"""
+    """Asynchronously generate video in a thread pool with timeout"""
     try:
-        # Update status to generating
-        video_status[video_id] = {
-            "status": "generating",
-            "progress": 25,
-            "error": None,
-            "videoUrl": None
-        }
+        # Set initial status
+        update_progress(video_id, 0)
         
-        # Run video generation in thread pool
+        # Run video generation in thread pool with timeout
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            thread_pool,
-            generate_simple_video,
-            video_id,
-            request.subreddit
-        )
-        
-        # Update status to ready
-        video_status[video_id] = {
-            "status": "ready",
-            "progress": 100,
-            "error": None,
-            "videoUrl": f"/video/{video_id}"
-        }
-        
+        try:
+            await asyncio.wait_for(
+                loop.run_in_executor(
+                    thread_pool,
+                    generate_simple_video,
+                    video_id,
+                    request
+                ),
+                timeout=300  # 5 minutes timeout
+            )
+        except asyncio.TimeoutError:
+            update_progress(video_id, 0, "failed", "Video generation timed out")
+            raise HTTPException(status_code=500, detail="Video generation timed out")
+            
     except Exception as e:
         error_msg = str(e)
         print(f"Error in generate_video_async: {error_msg}")
-        video_status[video_id] = {
-            "status": "failed",
-            "progress": 0,
-            "error": error_msg,
-            "videoUrl": None
-        }
+        update_progress(video_id, 0, "failed", error_msg)
+        raise
 
 @app.post("/generate-video", response_model=VideoResponse)
 async def generate_video(request: VideoRequest):
@@ -235,21 +216,15 @@ async def generate_video(request: VideoRequest):
 
     except Exception as e:
         error_msg = str(e)
-        video_status[video_id] = {
-            "status": "failed",
-            "progress": 0,
-            "error": error_msg,
-            "videoUrl": None
-        }
-        
+        update_progress(video_id, 0, "failed", error_msg)
         raise HTTPException(status_code=500, detail=error_msg)
 
 @app.get("/video-status/{video_id}")
 async def get_video_status(video_id: str):
-    if video_id not in video_status:
+    status = get_status(video_id)
+    if not status:
         raise HTTPException(status_code=404, detail="Video not found")
-    
-    return video_status[video_id]
+    return status
 
 @app.get("/video/{video_id}")
 async def get_video(video_id: str):
@@ -258,7 +233,8 @@ async def get_video(video_id: str):
     
     if not video_path.exists():
         # Check if video is still generating
-        if video_id in video_status and video_status[video_id]["status"] == "generating":
+        status = get_status(video_id)
+        if status and status["status"] == "generating":
             return {
                 "status": "generating",
                 "message": "Video is still being generated"
@@ -271,6 +247,10 @@ async def get_video(video_id: str):
         media_type="video/mp4",
         filename=video_filename
     )
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
 
 if __name__ == "__main__":
     import uvicorn
