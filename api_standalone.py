@@ -1,8 +1,3 @@
-#!/usr/bin/env python3
-"""
-Standalone FastAPI service for Railway deployment
-This is a minimal video generation API that doesn't depend on the existing project structure
-"""
 import asyncio
 import json
 import os
@@ -28,10 +23,18 @@ app.add_middleware(
 )
 
 # Create directories for storing videos and status
-VIDEO_DIR = Path("/tmp/videos")
-STATUS_DIR = Path("/tmp/status")
-VIDEO_DIR.mkdir(exist_ok=True)
-STATUS_DIR.mkdir(exist_ok=True)
+# Use a directory that persists across restarts
+DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
+VIDEO_DIR = DATA_DIR / "videos"
+STATUS_DIR = DATA_DIR / "status"
+
+# Create directories
+for directory in [DATA_DIR, VIDEO_DIR, STATUS_DIR]:
+    directory.mkdir(parents=True, exist_ok=True)
+    # Ensure directory is writable
+    os.chmod(str(directory), 0o777)
+
+print(f"Using data directories: VIDEO_DIR={VIDEO_DIR}, STATUS_DIR={STATUS_DIR}")
 
 class VideoRequest(BaseModel):
     subreddit: str
@@ -51,17 +54,30 @@ thread_pool = ThreadPoolExecutor(max_workers=2)
 
 def save_status(video_id: str, status: Dict[str, Any]):
     """Save video status to a file"""
-    status_file = STATUS_DIR / f"{video_id}.json"
-    with open(status_file, 'w') as f:
-        json.dump(status, f)
+    try:
+        status_file = STATUS_DIR / f"{video_id}.json"
+        with open(status_file, 'w') as f:
+            json.dump(status, f)
+        # Ensure file is readable
+        os.chmod(str(status_file), 0o666)
+        print(f"Saved status to {status_file}: {status}")
+    except Exception as e:
+        print(f"Error saving status: {e}")
+        raise
 
 def get_status(video_id: str) -> Optional[Dict[str, Any]]:
     """Get video status from file"""
-    status_file = STATUS_DIR / f"{video_id}.json"
     try:
+        status_file = STATUS_DIR / f"{video_id}.json"
+        if not status_file.exists():
+            print(f"Status file not found: {status_file}")
+            return None
         with open(status_file) as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+            status = json.load(f)
+            print(f"Read status from {status_file}: {status}")
+            return status
+    except Exception as e:
+        print(f"Error reading status: {e}")
         return None
 
 def update_progress(video_id: str, progress: int, status: str = "generating", error: Optional[str] = None):
@@ -72,49 +88,8 @@ def update_progress(video_id: str, progress: int, status: str = "generating", er
         "error": error,
         "videoUrl": f"/video/{video_id}" if status == "ready" else None
     }
+    print(f"Updating progress for {video_id}: {status_data}")
     save_status(video_id, status_data)
-
-def create_text_image(text: str, size: tuple = (1080, 1920), font_size: int = 60) -> 'PIL.Image.Image':
-    """Create an image with text using PIL instead of MoviePy TextClip"""
-    from PIL import Image, ImageDraw, ImageFont
-    import textwrap
-    
-    # Create a black image
-    img = Image.new('RGB', size, color='black')
-    draw = ImageDraw.Draw(img)
-    
-    # Try to use a default font, fallback to built-in if needed
-    try:
-        # Try to load a system font
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
-    except (OSError, IOError):
-        try:
-            # Fallback to default font
-            font = ImageFont.load_default()
-        except:
-            font = None
-    
-    # Wrap text to fit the image
-    wrapper = textwrap.TextWrapper(width=30)  # Adjust width as needed
-    wrapped_text = wrapper.fill(text)
-    
-    # Calculate text position (center)
-    if font:
-        bbox = draw.textbbox((0, 0), wrapped_text, font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-    else:
-        # Estimate size if no font available
-        text_width = len(wrapped_text.split('\n')[0]) * 10
-        text_height = len(wrapped_text.split('\n')) * 20
-    
-    x = (size[0] - text_width) // 2
-    y = (size[1] - text_height) // 2
-    
-    # Draw text
-    draw.text((x, y), wrapped_text, fill='white', font=font, align='center')
-    
-    return img
 
 def generate_simple_video(video_id: str, request: VideoRequest) -> str:
     """Generate a simple video using PIL and MoviePy"""
@@ -158,6 +133,9 @@ def generate_simple_video(video_id: str, request: VideoRequest) -> str:
             temp_audiofile=None,
             remove_temp=True
         )
+        
+        # Ensure video file is readable
+        os.chmod(str(video_path), 0o666)
         
         # Clean up
         if text_img_path.exists():
@@ -250,7 +228,47 @@ async def get_video(video_id: str):
 
 @app.get("/health")
 async def health_check():
-    return {"status": "ok"}
+    # Check if data directories exist and are writable
+    health_data = {
+        "status": "ok",
+        "service": "video-generation-api",
+        "version": "1.0.0",
+        "storage": {}
+    }
+    
+    for name, path in [("data", DATA_DIR), ("videos", VIDEO_DIR), ("status", STATUS_DIR)]:
+        try:
+            # Check if directory exists
+            exists = path.exists()
+            # Check if directory is writable
+            writable = os.access(str(path), os.W_OK)
+            # Try to write a test file
+            test_file = path / ".test"
+            can_write = False
+            try:
+                test_file.touch()
+                can_write = True
+                test_file.unlink()
+            except:
+                pass
+            
+            health_data["storage"][name] = {
+                "path": str(path),
+                "exists": exists,
+                "writable": writable,
+                "can_write": can_write
+            }
+            
+            if not (exists and writable and can_write):
+                health_data["status"] = "warning"
+        except Exception as e:
+            health_data["storage"][name] = {
+                "path": str(path),
+                "error": str(e)
+            }
+            health_data["status"] = "error"
+    
+    return health_data
 
 if __name__ == "__main__":
     import uvicorn
