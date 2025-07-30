@@ -248,22 +248,43 @@ async def get_video(video_id: str):
     video_filename = f"video_{video_id}.mp4"
     video_path = VIDEO_DIR / video_filename
     
-    if not video_path.exists():
-        # Check if video is still generating
-        status = get_status(video_id)
-        if status and status["status"] == "generating":
-            return {
-                "status": "generating",
-                "message": "Video is still being generated"
-            }
-        
-        raise HTTPException(status_code=404, detail="Video file not found")
+    print(f"Requested video: {video_path}")
     
-    return FileResponse(
-        path=str(video_path),
-        media_type="video/mp4",
-        filename=video_filename
-    )
+    try:
+        if not video_path.exists():
+            print(f"Video file not found at {video_path}")
+            # Check if video is still generating
+            status = get_status(video_id)
+            if status and status["status"] == "generating":
+                print(f"Video {video_id} is still generating")
+                return {
+                    "status": "generating",
+                    "message": "Video is still being generated"
+                }
+            
+            print(f"Video {video_id} not found and not generating")
+            raise HTTPException(status_code=404, detail="Video file not found")
+        
+        # Check file permissions
+        print(f"Video file exists. Checking permissions...")
+        try:
+            with open(video_path, 'rb') as f:
+                # Try to read first byte
+                f.read(1)
+            print(f"Video file is readable")
+        except Exception as e:
+            print(f"Error reading video file: {e}")
+            raise HTTPException(status_code=500, detail=f"Error reading video file: {e}")
+        
+        print(f"Serving video file: {video_path}")
+        return FileResponse(
+            path=str(video_path),
+            media_type="video/mp4",
+            filename=video_filename
+        )
+    except Exception as e:
+        print(f"Error serving video: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
 async def health_check():
