@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bouncing Captions</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            width: 1080px;
+            height: 1920px;
+            background: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .caption-container {
+            position: absolute;
+            bottom: 400px; /* Above bottom third */
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            max-width: 900px;
+            padding: 0 40px;
+        }
+        
+        .caption-text {
+            font-size: 72px;
+            font-weight: 900;
+            color: white;
+            text-shadow: 
+                2px 2px 0px #000,
+                -2px -2px 0px #000,
+                2px -2px 0px #000,
+                -2px 2px 0px #000,
+                0px 4px 8px rgba(0, 0, 0, 0.5);
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+            opacity: 0;
+            transform: scale(0.8);
+            animation: bounceIn 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+        }
+        
+        @keyframes bounceIn {
+            0% {
+                opacity: 0;
+                transform: scale(0.8) translateY(20px);
+            }
+            60% {
+                opacity: 1;
+                transform: scale(1.05) translateY(-5px);
+            }
+            80% {
+                transform: scale(0.98) translateY(2px);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0px);
+            }
+        }
+        
+        @keyframes bounceOut {
+            0% {
+                opacity: 1;
+                transform: scale(1) translateY(0px);
+            }
+            30% {
+                opacity: 1;
+                transform: scale(1.02) translateY(-2px);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(0.9) translateY(10px);
+            }
+        }
+        
+        .fade-out {
+            animation: bounceOut 0.3s ease-in forwards;
+        }
+        
+        /* Pulse effect for emphasis */
+        .pulse {
+            animation: pulse 0.8s ease-in-out;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.03);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="caption-container">
+        <div class="caption-text" id="caption">{{text}}</div>
+    </div>
+    
+    <script>
+        // Auto-hide caption after duration
+        setTimeout(() => {
+            const caption = document.getElementById('caption');
+            caption.classList.add('fade-out');
+        }, {{duration}} * 1000 - 300); // Start fade 300ms before end
+        
+        // Add pulse effect for emphasis words
+        const text = '{{text}}';
+        if (text.includes('!') || text.includes('?') || text.length <= 4) {
+            setTimeout(() => {
+                const caption = document.getElementById('caption');
+                caption.classList.add('pulse');
+            }, 200);
+        }
+    </script>
+</body>
+</html> 
