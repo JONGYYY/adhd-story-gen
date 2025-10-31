@@ -12,7 +12,7 @@ import {
   signInWithPopup,
   sendPasswordResetEmail
 } from 'firebase/auth';
-import { auth, Auth } from '@/lib/firebase';
+import { getClientAuth, Auth } from '@/lib/firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -74,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Handle auth state changes
   useEffect(() => {
+    const auth = getClientAuth();
     // Check if Firebase auth is properly initialized
     if (!auth) {
       console.error('Firebase auth is not initialized');
@@ -111,6 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   const signIn = async (email: string, password: string) => {
+    const auth = getClientAuth();
     if (!auth) {
       throw new Error('Firebase auth is not initialized');
     }
@@ -120,6 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string) => {
+    const auth = getClientAuth();
     if (!auth) {
       throw new Error('Firebase auth is not initialized');
     }
@@ -129,6 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithGoogle = async () => {
+    const auth = getClientAuth();
     if (!auth) {
       throw new Error('Firebase auth is not initialized');
     }
@@ -139,6 +143,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    const auth = getClientAuth();
     if (!auth) {
       throw new Error('Firebase auth is not initialized');
     }

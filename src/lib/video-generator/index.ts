@@ -1,4 +1,4 @@
-import { VideoOptions, SubredditStory, VideoSegment, VideoMetadata, VideoGenerationOptions } from './types';
+1import { VideoOptions, SubredditStory, VideoSegment, VideoMetadata, VideoGenerationOptions } from './types';
 import { generateStory } from '../story-generator/openai';
 import { selectBackgroundClips, processBackgroundClip } from './background';
 import { generateSpeech, getAudioDuration } from './voice';
@@ -8,7 +8,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs/promises';
-import { generateVideo as generateHybridVideo } from './hybrid-generator';
+import { generateVideoWithRemotion } from './remotion-entry';
 
 const execAsync = promisify(exec);
 
@@ -27,8 +27,8 @@ function splitIntoSegments(text: string): string[] {
     .filter(segment => segment.length > 0);
 }
 
-export { generateVideo as generateMoviePyVideo } from './moviepy-generator';
-export { generateVideo as generateHybridVideo } from './hybrid-generator';
+// export { generateVideo as generateMoviePyVideo } from './moviepy-generator'; // disabled: force Remotion
+// export { generateVideo as generateHybridVideo } from './hybrid-generator'; // disabled: force Remotion
 
 export async function generateVideo(options: VideoOptions, videoId: string): Promise<string> {
   // Generate or use custom story
@@ -53,5 +53,7 @@ export async function generateVideo(options: VideoOptions, videoId: string): Pro
     story,
   };
 
-  return generateHybridVideo(generationOptions, videoId);
+  // Force Remotion pipeline only (no MoviePy / hybrid fallback)
+  console.log(`[gen ${videoId}] Forcing Remotion pipeline`);
+  return await generateVideoWithRemotion(generationOptions as any, videoId);
 } 
