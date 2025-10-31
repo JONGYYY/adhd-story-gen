@@ -1,0 +1,40 @@
+# fly.toml app configuration file generated for adhd-story-gen-google-cloud-run on 2025-10-31T19:04:37-04:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'adhd-story-gen-google-cloud-run'
+primary_region = 'iad'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[deploy]
+  strategy = 'immediate'
+
+[env]
+  NODE_ENV = 'production'
+  PORT = '3000'
+  REMOTION_ENABLED = 'true'
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
+
+  [http_service.concurrency]
+    type = 'requests'
+    hard_limit = 50
+    soft_limit = 25
+
+[checks]
+  [checks.http]
+    port = 8080
+    type = 'http'
+    interval = '15s'
+    timeout = '5s'
+    grace_period = '30s'
+    path = '/api/health'
