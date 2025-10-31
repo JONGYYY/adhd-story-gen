@@ -63,13 +63,14 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Root route: redirect to frontend or show basic info
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://adhd-story-gen.vercel.app';
+// Root route: show basic info (avoid accidental redirects)
+const FRONTEND_URL = process.env.FRONTEND_URL;
 app.get('/', (req, res) => {
-  if (FRONTEND_URL) {
-    return res.redirect(302, FRONTEND_URL);
-  }
-  res.status(200).send('StoryGen worker is running. Use /generate-video or /api/health.');
+  res.status(200).send(
+    FRONTEND_URL
+      ? `StoryGen worker is running. Visit frontend at ${FRONTEND_URL}. Endpoints: /generate-video, /api/health.`
+      : 'StoryGen worker is running. Endpoints: /generate-video, /api/health.'
+  );
 });
 
 // External background mapping (replace with your own CDN later)

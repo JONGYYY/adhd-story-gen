@@ -70,8 +70,9 @@ export async function POST(request: NextRequest) {
     console.log('Session cookie created successfully, length:', sessionCookie.length);
 
     const hostHeader = request.headers.get('host');
-    const cookieDomain = isProduction ? determineCookieDomain(hostHeader) : undefined;
-    console.log('Resolved cookie domain:', cookieDomain || '(host-only)');
+    // Use host-only cookies to avoid cross-subdomain/domain issues
+    const cookieDomain = undefined;
+    console.log('Resolved cookie domain:', '(host-only)');
 
     // Set cookie options
     const options = {
@@ -82,6 +83,7 @@ export async function POST(request: NextRequest) {
       secure: isProduction,
       path: '/',
       sameSite: 'lax' as const,
+      // host-only cookie
       domain: cookieDomain,
     };
 
