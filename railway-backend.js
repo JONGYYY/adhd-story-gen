@@ -63,6 +63,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Root route: redirect to frontend or show basic info
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://adhd-story-gen.vercel.app';
+app.get('/', (req, res) => {
+  if (FRONTEND_URL) {
+    return res.redirect(302, FRONTEND_URL);
+  }
+  res.status(200).send('StoryGen worker is running. Use /generate-video or /api/health.');
+});
+
 // External background mapping (replace with your own CDN later)
 const EXTERNAL_BG = {
   minecraft: process.env.BG_MINECRAFT_URL || 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
