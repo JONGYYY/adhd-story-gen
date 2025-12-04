@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs-18_x", "ffmpeg", "fontconfig", "dejavu_fonts"]
+nixPkgs = ["nodejs-18_x", "ffmpeg", "fontconfig", "dejavu_fonts", "chromium"]
 
 [phases.install]
 cmds = [
@@ -9,7 +9,7 @@ cmds = [
 
 [phases.build]
 cmds = [
-    "node -e \"const esbuild=require('esbuild'); esbuild.build({entryPoints:['src/lib/video-generator/efficient-generator.ts'], bundle:true, platform:'node', format:'cjs', outfile:'dist/efficient-generator.js', sourcemap:false}).catch(e=>{console.error(e); process.exit(1);})\""
+    "echo Skipping efficient-generator bundling for Remotion pipeline"
 ]
 
 [start]

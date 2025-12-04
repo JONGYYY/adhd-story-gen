@@ -26,7 +26,8 @@ export default function VideoPage() {
   useEffect(() => {
     const checkStatus = async () => {
       try {
-        const response = await fetch(`/api/video-status/${videoId}`);
+        const API_BASE = process.env.NEXT_PUBLIC_RAILWAY_API_URL || '';
+        const response = await fetch(`${API_BASE}/api/video-status/${videoId}`);
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(errorText || 'Failed to fetch video status');
@@ -91,7 +92,7 @@ export default function VideoPage() {
     if (!videoStatus.videoUrl) return;
 
     try {
-      const response = await fetch(videoStatus.videoUrl);
+      const response = await fetch(videoStatus.videoUrl.startsWith('http') ? videoStatus.videoUrl : `${process.env.NEXT_PUBLIC_RAILWAY_API_URL || ''}${videoStatus.videoUrl}`);
       if (!response.ok) throw new Error('Failed to download video');
 
       const blob = await response.blob();

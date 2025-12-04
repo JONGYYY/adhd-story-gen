@@ -19,7 +19,8 @@ export default function TestPage() {
     setVideoUrl(null);
 
     try {
-      const response = await fetch('/api/generate-test-video', {
+      const API_BASE = process.env.NEXT_PUBLIC_RAILWAY_API_URL || '';
+      const response = await fetch(`${API_BASE}/api/generate-test-video`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -40,7 +41,8 @@ export default function TestPage() {
         const videoId = data.videoId;
         const pollProgress = async () => {
           try {
-            const statusResponse = await fetch(`/api/video-status/${videoId}`);
+            const API_BASE = process.env.NEXT_PUBLIC_RAILWAY_API_URL || '';
+            const statusResponse = await fetch(`${API_BASE}/api/video-status/${videoId}`);
             const statusData = await statusResponse.json();
             
             setProgress(statusData.progress || 0);

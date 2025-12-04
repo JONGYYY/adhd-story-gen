@@ -269,7 +269,9 @@ export default function Create() {
       console.log('Sending video generation request...');
       let response;
       try {
-        response = await fetch('/api/generate-video', {
+        // Use worker base URL if provided; fall back to same-origin
+        const API_BASE = process.env.NEXT_PUBLIC_RAILWAY_API_URL || '';
+        response = await fetch(`${API_BASE}/api/generate-video`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -354,7 +356,8 @@ export default function Create() {
           
           let statusResponse;
           try {
-            statusResponse = await fetch(`/api/video-status/${data.videoId}`, {
+            const API_BASE = process.env.NEXT_PUBLIC_RAILWAY_API_URL || '';
+            statusResponse = await fetch(`${API_BASE}/api/video-status/${data.videoId}`, {
               method: 'GET',
               cache: 'no-cache',
               headers: {
@@ -390,8 +393,11 @@ export default function Create() {
             
             // Add a small delay to ensure UI updates
             setTimeout(() => {
-              console.log('Redirecting to:', `/video/${data.videoId}`);
-              window.location.href = `/video/${data.videoId}`;
+              // Redirect directly to the MP4 served by the worker
+              const API_BASE = process.env.NEXT_PUBLIC_RAILWAY_API_URL || '';
+              const target = statusData.videoUrl || `${API_BASE}/videos/${data.videoId}.mp4`;
+              console.log('Redirecting to:', target);
+              window.location.href = target;
             }, 500);
             
           } else if (statusData.status === 'failed') {
